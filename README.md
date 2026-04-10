@@ -1,4 +1,4 @@
-# g_async
+# zync
 
 A minimal cooperative coroutine scheduler in C, built on POSIX `ucontext`.
 
