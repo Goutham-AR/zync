@@ -4,7 +4,7 @@
 
 void coro_free(Coroutine *c) {
     if (c->stack) {
-        munmap(c->stack, STACK_SIZE + PAGE_SIZE);
+        munmap(c->stack, c->stack_size + PAGE_SIZE);
         c->stack = NULL;
     }
     c->done = false;
@@ -22,7 +22,7 @@ int yield(Scheduler *s) {
     rq_enqueue(s, s->current_idx);
     int res = swapcontext(&s->coros[s->current_idx].context, &s->loop_ctx);
     if (res == -1) {
-        fprintf(stderr, "swapcontext failed\n");
+        fprintf(stderr, "yield: swapcontext failed\n");
         return -1;
     }
     return 0;
@@ -36,11 +36,13 @@ static void do_coro(int high, int low, int self_idx) {
     coro->done = true;
 }
 
-int spawn(Scheduler *s, CoroFn cb, void *arg) {
+int spawn(Scheduler *s, CoroFn cb, void *arg, size_t stack_size, const char *name) {
     if (!s || !cb) {
         fprintf(stderr, "spawn: NULL scheduler or callback\n");
         return -1;
     }
+
+    size_t ss = stack_size ? stack_size : CORO_DEFAULT_STACK_SIZE;
 
     /* pick a slot: recycle a finished one first, then grow high_water */
     int idx;
@@ -57,31 +59,33 @@ int spawn(Scheduler *s, CoroFn cb, void *arg) {
 
     int res = getcontext(&coro->context);
     if (res == -1) {
-        fprintf(stderr, "getcontext failed\n");
+        fprintf(stderr, "spawn: getcontext failed\n");
         return -1;
     }
 
     size_t page = PAGE_SIZE;
-    uint8_t *map = mmap(NULL, STACK_SIZE + page,
+    uint8_t *map = mmap(NULL, ss + page,
                         PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS,
                         -1, 0);
     if (map == MAP_FAILED) {
-        fprintf(stderr, "mmap failed\n");
+        fprintf(stderr, "spawn: mmap failed\n");
         return -1;
     }
     if (mprotect(map, page, PROT_NONE) == -1) {
-        fprintf(stderr, "mprotect failed\n");
-        munmap(map, STACK_SIZE + page);
+        fprintf(stderr, "spawn: mprotect failed\n");
+        munmap(map, ss + page);
         return -1;
     }
 
-    coro->done     = false;
-    coro->stack    = map;
-    coro->cb       = cb;
-    coro->arg      = arg;
-    coro->self_idx = idx;
-    coro->context.uc_stack.ss_size = STACK_SIZE;
+    coro->done       = false;
+    coro->stack      = map;
+    coro->stack_size = ss;
+    coro->cb         = cb;
+    coro->arg        = arg;
+    coro->name       = name;
+    coro->self_idx   = idx;
+    coro->context.uc_stack.ss_size = ss;
     coro->context.uc_stack.ss_sp   = map + page;
     coro->context.uc_link          = &s->loop_ctx;
 

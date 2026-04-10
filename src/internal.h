@@ -10,7 +10,6 @@
 #  define MAP_ANONYMOUS 0x1000
 #endif
 
-#define STACK_SIZE (64 * 1024)
 #define PAGE_SIZE  ((size_t)sysconf(_SC_PAGE_SIZE))
 
 void coro_free(Coroutine *c);
