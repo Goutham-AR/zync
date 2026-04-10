@@ -12,7 +12,7 @@ static void counter(Scheduler *s, void *userdata) {
 
 int main(void) {
     Scheduler scheduler;
-    scheduler_init(&scheduler);
+    assert(!scheduler_init(&scheduler, CORO_DEFAULT_CAPACITY));
 
     int id1 = 1, id2 = 2, id3 = 3;
     assert(!spawn(&scheduler, counter, &id1));

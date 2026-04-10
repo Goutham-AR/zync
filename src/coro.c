@@ -3,11 +3,11 @@
 #include <stdint.h>
 
 void coro_free(Coroutine *c) {
-    if (c->done && c->stack) {
-        // stack points to the base of the mmap region (including guard page)
+    if (c->stack) {
         munmap(c->stack, STACK_SIZE + PAGE_SIZE);
         c->stack = NULL;
     }
+    c->done = false;
 }
 
 int yield(Scheduler *s) {
@@ -19,6 +19,7 @@ int yield(Scheduler *s) {
         fprintf(stderr, "yield: called outside a coroutine\n");
         return -1;
     }
+    rq_enqueue(s, s->current_idx);
     int res = swapcontext(&s->coros[s->current_idx].context, &s->loop_ctx);
     if (res == -1) {
         fprintf(stderr, "swapcontext failed\n");
@@ -40,12 +41,18 @@ int spawn(Scheduler *s, CoroFn cb, void *arg) {
         fprintf(stderr, "spawn: NULL scheduler or callback\n");
         return -1;
     }
-    if (s->total_spawned >= MAX_COROS) {
-        fprintf(stderr, "spawn: max coroutines reached\n");
+
+    /* pick a slot: recycle a finished one first, then grow high_water */
+    int idx;
+    if (s->free_count > 0) {
+        idx = s->free_slots[--s->free_count];
+    } else if (s->high_water < s->capacity) {
+        idx = (int)s->high_water++;
+    } else {
+        fprintf(stderr, "spawn: capacity reached (%zu)\n", s->capacity);
         return -1;
     }
 
-    size_t idx = s->total_spawned;
     Coroutine *coro = &s->coros[idx];
 
     int res = getcontext(&coro->context);
@@ -68,22 +75,20 @@ int spawn(Scheduler *s, CoroFn cb, void *arg) {
         munmap(map, STACK_SIZE + page);
         return -1;
     }
-    uint8_t *stack = map + page;
 
-    coro->done = false;
-    coro->stack = map;   // base of mmap region (includes guard page)
-    coro->cb = cb;
-    coro->arg = arg;
-    coro->self_idx = (int)idx;
+    coro->done     = false;
+    coro->stack    = map;
+    coro->cb       = cb;
+    coro->arg      = arg;
+    coro->self_idx = idx;
     coro->context.uc_stack.ss_size = STACK_SIZE;
-    coro->context.uc_stack.ss_sp = stack;
-    coro->context.uc_link = &s->loop_ctx;
+    coro->context.uc_stack.ss_sp   = map + page;
+    coro->context.uc_link          = &s->loop_ctx;
 
     uintptr_t ptr = (uintptr_t)s;
-    int low_bits = (int)(ptr & 0xFFFFFFFF);
-    int high_bits = (int)(ptr >> 32);
-    makecontext(&coro->context, (void (*)())do_coro, 3, high_bits, low_bits, (int)idx);
+    makecontext(&coro->context, (void (*)())do_coro, 3,
+                (int)(ptr >> 32), (int)(ptr & 0xFFFFFFFF), idx);
 
-    ++s->total_spawned;
+    rq_enqueue(s, idx);
     return 0;
 }
