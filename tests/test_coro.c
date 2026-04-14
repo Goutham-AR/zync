@@ -22,9 +22,9 @@ static void reset_order(void) {
 /* ------------------------------------------------------------------ tests */
 
 /* 1. Normal completion — coroutine runs and finishes without yielding */
-static void simple_cb(Scheduler *s, void *arg) {
+static void simple_cb(Scheduler* s, void* arg) {
     (void)s;
-    record(*(int *)arg);
+    record(*(int*)arg);
 }
 
 static void test_normal_completion(void) {
@@ -48,8 +48,8 @@ static void test_normal_completion(void) {
 }
 
 /* 2. Yield/resume ordering — two coroutines interleave round-robin */
-static void interleave_cb(Scheduler *s, void *arg) {
-    int id = *(int *)arg;
+static void interleave_cb(Scheduler* s, void* arg) {
+    int id = *(int*)arg;
     for (int i = 0; i < 3; ++i) {
         record(id * 10 + i);
         assert(!yield(s));
@@ -68,16 +68,19 @@ static void test_yield_ordering(void) {
 
     /* expected: 10,20, 11,21, 12,22 */
     assert(g_order_count == 6);
-    assert(g_order[0] == 10); assert(g_order[1] == 20);
-    assert(g_order[2] == 11); assert(g_order[3] == 21);
-    assert(g_order[4] == 12); assert(g_order[5] == 22);
+    assert(g_order[0] == 10);
+    assert(g_order[1] == 20);
+    assert(g_order[2] == 11);
+    assert(g_order[3] == 21);
+    assert(g_order[4] == 12);
+    assert(g_order[5] == 22);
 
     scheduler_destroy(&s);
     PASS("yield_ordering");
 }
 
 /* 3. Spawn-at-capacity — returns -1 when all slots are occupied */
-static void long_cb(Scheduler *s, void *arg) {
+static void long_cb(Scheduler* s, void* arg) {
     (void)arg;
     yield(s);
 }
@@ -101,8 +104,9 @@ static void test_spawn_at_capacity(void) {
 }
 
 /* 4. Slot recycling — after coroutines finish, new ones reuse their slots */
-static void noop_cb(Scheduler *s, void *arg) {
-    (void)s; (void)arg;
+static void noop_cb(Scheduler* s, void* arg) {
+    (void)s;
+    (void)arg;
 }
 
 static void test_slot_recycling(void) {
@@ -129,9 +133,9 @@ static void test_slot_recycling(void) {
 }
 
 /* 5. Custom stack size — spawn with explicit size, verify it runs correctly */
-static void stack_size_cb(Scheduler *s, void *arg) {
+static void stack_size_cb(Scheduler* s, void* arg) {
     (void)s;
-    record(*(int *)arg);
+    record(*(int*)arg);
 }
 
 static void test_custom_stack_size(void) {
@@ -153,8 +157,9 @@ static void test_custom_stack_size(void) {
 }
 
 /* 6. Coroutine name — verify name is stored and visible via scheduler_dump */
-static void named_cb(Scheduler *s, void *arg) {
-    (void)s; (void)arg;
+static void named_cb(Scheduler* s, void* arg) {
+    (void)s;
+    (void)arg;
 }
 
 static void test_coroutine_name(void) {

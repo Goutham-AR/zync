@@ -1,10 +1,22 @@
 CC     := clang
 CFLAGS := -Wall -Wextra -g -Iinclude/ -D_XOPEN_SOURCE=700 -MMD -MP
 SFLAGS := $(CFLAGS) -fsanitize=address,undefined
+FORMATTER = clang-format
+FORMAT_FLAGS = -i -style=file
+SRC_FILES = $(shell find . -name "*.c" -o -name "*.h")
+
+
+.PHONY: format
 
 LIB_OBJS := bin/coro.o bin/scheduler.o
 
 .PHONY: all build test sanitize clean bin
+
+# Format target
+format:
+	@echo "Formatting all source files..."
+	@$(FORMATTER) $(FORMAT_FLAGS) $(SRC_FILES)
+	@echo "Done."
 
 all: build
 

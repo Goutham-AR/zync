@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <stdio.h>
 
-static void counter(Scheduler *s, void *userdata) {
-    int id = *(int *)userdata;
+static void counter(Scheduler* s, void* userdata) {
+    int id = *(int*)userdata;
     for (int i = 0; i < 3; ++i) {
         printf("[%d] %d\n", id, i);
         assert(!yield(s));

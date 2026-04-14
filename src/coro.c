@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-void coro_free(Coroutine *c) {
+void coro_free(Coroutine* c) {
     if (c->stack) {
         munmap(c->stack, c->stack_size + PAGE_SIZE);
         c->stack = NULL;
@@ -10,7 +10,7 @@ void coro_free(Coroutine *c) {
     c->done = false;
 }
 
-int yield(Scheduler *s) {
+int yield(Scheduler* s) {
     if (!s) {
         fprintf(stderr, "yield: NULL scheduler\n");
         return -1;
@@ -30,13 +30,13 @@ int yield(Scheduler *s) {
 
 static void do_coro(int high, int low, int self_idx) {
     uintptr_t ptr = (uintptr_t)((uintptr_t)high << 32 | (uintptr_t)(unsigned int)low);
-    Scheduler *s = (Scheduler *)ptr;
-    Coroutine *coro = &s->coros[self_idx];
+    Scheduler* s = (Scheduler*)ptr;
+    Coroutine* coro = &s->coros[self_idx];
     coro->cb(s, coro->arg);
     coro->done = true;
 }
 
-int spawn(Scheduler *s, CoroFn cb, void *arg, size_t stack_size, const char *name) {
+int spawn(Scheduler* s, CoroFn cb, void* arg, size_t stack_size, const char* name) {
     if (!s || !cb) {
         fprintf(stderr, "spawn: NULL scheduler or callback\n");
         return -1;
@@ -55,7 +55,7 @@ int spawn(Scheduler *s, CoroFn cb, void *arg, size_t stack_size, const char *nam
         return -1;
     }
 
-    Coroutine *coro = &s->coros[idx];
+    Coroutine* coro = &s->coros[idx];
 
     int res = getcontext(&coro->context);
     if (res == -1) {
@@ -64,7 +64,7 @@ int spawn(Scheduler *s, CoroFn cb, void *arg, size_t stack_size, const char *nam
     }
 
     size_t page = PAGE_SIZE;
-    uint8_t *map = mmap(NULL, ss + page,
+    uint8_t* map = mmap(NULL, ss + page,
                         PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS,
                         -1, 0);
@@ -78,16 +78,16 @@ int spawn(Scheduler *s, CoroFn cb, void *arg, size_t stack_size, const char *nam
         return -1;
     }
 
-    coro->done       = false;
-    coro->stack      = map;
+    coro->done = false;
+    coro->stack = map;
     coro->stack_size = ss;
-    coro->cb         = cb;
-    coro->arg        = arg;
-    coro->name       = name;
-    coro->self_idx   = idx;
+    coro->cb = cb;
+    coro->arg = arg;
+    coro->name = name;
+    coro->self_idx = idx;
     coro->context.uc_stack.ss_size = ss;
-    coro->context.uc_stack.ss_sp   = map + page;
-    coro->context.uc_link          = &s->loop_ctx;
+    coro->context.uc_stack.ss_sp = map + page;
+    coro->context.uc_link = &s->loop_ctx;
 
     uintptr_t ptr = (uintptr_t)s;
     makecontext(&coro->context, (void (*)())do_coro, 3,
